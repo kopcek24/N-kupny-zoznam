@@ -130,10 +130,10 @@ function dealsFor(name){
 function queueSemantic(){}
 
 /* ---------- ukladanie (Firestore, spoločné pre domácnosť) ---------- */
-// zoznam a kupóny sú spoločné pre domácnosť, obľúbené má každý používateľ vlastné
-const colRef = col => col==="oblubene" ? FB.collection(FB.db,"users",state.user.uid,"oblubene") : FB.collection(FB.db,"households",state.hh.id,col);
+// zoznam a kupóny sú spoločné; obľúbené má každý vlastné (pole "by"), ale ich zľavy vidia všetci členovia
+const colRef = col => FB.collection(FB.db,"households",state.hh.id,col);
 async function add(col, data){
-  if(state.user){ data.by=state.user.email; data.byName=state.user.displayName||state.user.email; }
+  if(state.user){ data.by=state.user.email.toLowerCase(); data.byName=state.user.displayName||state.user.email; }
   try{ await FB.addDoc(colRef(col),data); }catch(e){ console.error(e); flash("Nepodarilo sa uložiť."); }
 }
 async function upd(col, id, data){
@@ -235,13 +235,17 @@ function renderOblubene(){
 const daysLeft = iso => { if(!iso) return null; const a=new Date(iso+"T00:00:00"), b=new Date(todayISO()+"T00:00:00"); return Math.round((a-b)/864e5); };
 const leftTxt = n => n===0?"končí dnes":n===1?"končí zajtra":n<0?"vypršal":`ešte ${n} ${n<5?"dni":"dní"}`;
 function renderAlert(){
-  const hits=state.oblubene.filter(f=>!f.hide).map(f=>({f,ds:dealsFor(f.name)})).filter(h=>h.ds.length), el=$("alert");
+  const me=(state.user?.email||"").toLowerCase(), seenFav=new Map();
+  for(const f of (state.oblubeneAll||state.oblubene)){ if(f.hide) continue; const k=norm(f.name); const cur=seenFav.get(k);
+    if(!cur) seenFav.set(k,{...f, who:new Set([f.by===me?"ty":String(f.byName||f.by||"").split(" ")[0]])}); else cur.who.add(f.by===me?"ty":String(f.byName||f.by||"").split(" ")[0]); }
+  const multi=(state.hh?.emails||[]).length>1;
+  const hits=[...seenFav.values()].map(f=>({f,ds:dealsFor(f.name)})).filter(h=>h.ds.length), el=$("alert");
   const soon=state.kupony.filter(c=>{ const n=daysLeft(c.until); return n!=null && n>=0 && n<=2; });
   if(!hits.length && !soon.length){ el.hidden=true; return; }
   el.hidden=false; el.className="alert";
   let h=`<span class="bell" aria-hidden="true">!</span><div style="display:grid;gap:10px;min-width:0">`;
   if(soon.length) h+=`<div><b>${soon.length===1?"Kupón čoskoro končí":"Kupóny čoskoro končia: "+soon.length}</b><ul>${soon.map(c=>`<li><b style="display:inline;font-family:inherit;font-size:inherit">${esc(c.store)}</b> ${leftTxt(daysLeft(c.until))}: <code style="font-weight:700">${esc(c.code)}</code>${c.desc?" · "+esc(c.desc):""} <button class="more" data-act="copy" data-code="${esc(c.code)}">Kopírovať</button></li>`).join("")}</ul></div>`;
-  if(hits.length) h+=`<div><b>${hits.length===1?"Obľúbená vec je v zľave":"Obľúbené veci v zľave: "+hits.length}</b><ul>${hits.slice(0,6).map(({f,ds})=>{const d=ds[0];return `<li><b style="display:inline;font-family:inherit;font-size:inherit">${esc(f.name)}</b>: ${esc(STORES[d.store].name)} ${esc(eur(d.p))}${d.s?" / "+esc(d.s):""}${d.c?" ("+esc(d.c)+")":""}${status(d)==="next"?" od "+fmtD(d.f):""}${ds.length>1?` a ${ds.length-1}× inde`:""}${state.zoznam.some(i=>!i.done&&same(i.name,f.name))?` <span style="color:var(--muted)">· v zozname</span>`:` <button class="more" data-act="tolist" data-name="${esc(f.name)}">+ do zoznamu</button>`}</li>`}).join("")}</ul></div>`;
+  if(hits.length) h+=`<div><b>${hits.length===1?"Obľúbená vec je v zľave":"Obľúbené veci v zľave: "+hits.length}</b><ul>${hits.slice(0,6).map(({f,ds})=>{const d=ds[0];return `<li><b style="display:inline;font-family:inherit;font-size:inherit">${esc(f.name)}</b>${multi?` <span style="color:var(--muted)">(${esc([...f.who].join(", "))})</span>`:""}: ${esc(STORES[d.store].name)} ${esc(eur(d.p))}${d.s?" / "+esc(d.s):""}${d.c?" ("+esc(d.c)+")":""}${status(d)==="next"?" od "+fmtD(d.f):""}${ds.length>1?` a ${ds.length-1}× inde`:""}${state.zoznam.some(i=>!i.done&&same(i.name,f.name))?` <span style="color:var(--muted)">· v zozname</span>`:` <button class="more" data-act="tolist" data-name="${esc(f.name)}">+ do zoznamu</button>`}</li>`}).join("")}</ul></div>`;
   el.innerHTML=h+`</div>`;
 }
 function renderKupony(){
@@ -368,7 +372,7 @@ function openMembers(){
     <div class="members">${hh.emails.map(e=>`<div class="mrow"><span>${esc(e)} ${e===hh.owner?"<small>· založil</small>":""}${e===me?"<small> · ty</small>":""}</span>
       ${(owner&&e!==me)?`<button class="link" data-act="rmMember" data-email="${esc(e)}">Odobrať</button>`:""}</div>`).join("")}</div>
     <form class="add" id="memberForm" style="margin:0"><input id="memberInput" type="email" placeholder="e-mail (Google účet)" autocomplete="off" aria-label="E-mail nového člena"><button class="btn">Pridať</button></form>
-    <p class="note" style="margin:0">Nový člen otvorí túto aplikáciu, prihlási sa cez Google týmto e-mailom a hneď uvidí váš spoločný zoznam a kupóny. Obľúbené má každý svoje.</p>
+    <p class="note" style="margin:0">Nový člen otvorí túto aplikáciu, prihlási sa cez Google týmto e-mailom a hneď uvidí váš spoločný zoznam a kupóny. Obľúbené má každý svoje, no keď je niečo z nich v zľave, upozornenie uvidia všetci.</p>
     ${(!owner)?`<button class="link" data-act="leave" style="color:var(--sale);justify-self:start">Opustiť túto domácnosť</button>`:""}
     <button class="btn ghost" data-act="logout">Odhlásiť sa</button>
     <button class="btn ghost" data-act="close">Zavrieť</button>`;
@@ -416,7 +420,9 @@ async function startHousehold(user){
   }));
   state.hh={...first};
   for(const col of ["zoznam","oblubene","kupony"]){
-    unsubs.push(FB.onSnapshot(colRef(col),s=>{ state[col]=s.docs.map(d=>({id:d.id,...d.data()})); flash(""); render(); },
+    unsubs.push(FB.onSnapshot(colRef(col),s=>{ const rows=s.docs.map(d=>({id:d.id,...d.data()}));
+      if(col==="oblubene"){ state.oblubeneAll=rows; state.oblubene=rows.filter(r=>r.by===email); } else state[col]=rows;
+      flash(""); render(); },
       err=>{ console.error(err); flash("Dáta sa nedajú načítať. Skontroluj pripojenie."); }));
   }
 }
