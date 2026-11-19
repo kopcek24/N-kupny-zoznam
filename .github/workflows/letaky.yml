@@ -1,0 +1,61 @@
+name: Letáky a nasadenie
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # pondelok (Lidl), streda (Tesco, Billa) a štvrtok (Kaufland) o 5:00 slovenského času
+    - cron: "0 4 * * 1,3,4"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nástroje na čítanie PDF
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+
+      - name: Prehľadať letáky
+        if: github.event_name != 'push'
+        continue-on-error: true
+        run: python3 scraper/scrape.py
+
+      - name: Uložiť nové akcie do repozitára
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "letaky-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/data/katalog.json
+          git diff --cached --quiet || (git commit -m "Akcie z letákov $(date +%F)" && git push)
+
+      - name: Firebase konfigurácia z tajomstva (ak je nastavené)
+        env:
+          CFG: ${{ secrets.FIREBASE_WEB_CONFIG }}
+        run: |
+          if [ -n "$CFG" ]; then echo "export const firebaseConfig = $CFG;" > web/firebase-config.js; fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

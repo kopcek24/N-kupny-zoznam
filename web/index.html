@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Nákupy</title>
+<meta name="theme-color" content="#1f6b4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Nákupy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0;font-size:15px} [hidden]{display:none!important} img{max-width:100%}</style>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="login" id="login" hidden><div class="login-card">
+  <h1>Nákupy</h1>
+  <p>Spoločný nákupný zoznam s akciami z letákov.</p>
+  <button class="gbtn" id="gbtn"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.8-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.8 6C6.6 42.6 14.6 48 24 48z"/></svg>Prihlásiť sa cez Google</button>
+  <p id="loginMsg" style="font-size:.85rem"></p>
+</div></div>
+<div class="wrap" id="app" hidden>
+  <div class="topbar"><div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-zoznam" aria-selected="true">Zoznam</button>
+    <button class="tab" role="tab" id="t-kupony" aria-selected="false">Kupóny</button>
+    <button class="tab" role="tab" id="t-oblubene" aria-selected="false">Obľúbené</button>
+  </div><button class="acct" id="acct" data-act="members" aria-label="Účet a členovia"></button></div>
+  <div id="alert" hidden></div>
+  <section id="v-zoznam"></section>
+  <section id="v-kupony" hidden></section>
+  <section id="v-oblubene" hidden></section>
+  <p class="status" id="status">Načítavam…</p>
+</div>
+
+<nav class="dock" id="dockNav" hidden aria-label="Letáky obchodov"><button class="grip" id="grip" aria-label="Zobraziť všetky obchody" aria-expanded="false"></button><div class="dock-in" id="dock"></div><div class="dock-more" id="dockMore"></div></nav>
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"><div class="sheet-in" id="sheetIn"></div></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

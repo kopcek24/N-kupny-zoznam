@@ -1,0 +1,28 @@
+rules_version = '2';
+// Každá domácnosť má zoznam e-mailov členov. Dáta vidí a mení len prihlásený člen.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function me() { return request.auth.token.email.lower(); }
+
+    match /households/{hid} {
+      allow read: if signedIn() && me() in resource.data.emails;
+      allow create: if signedIn() && request.resource.data.owner == me()
+                    && request.resource.data.emails == [me()];
+      // člen môže pridávať a odoberať členov; vlastník sa odstrániť nedá
+      allow update: if signedIn() && me() in resource.data.emails
+                    && request.resource.data.owner == resource.data.owner
+                    && resource.data.owner in request.resource.data.emails
+                    && request.resource.data.emails.size() <= 20
+                    || (signedIn() && me() in resource.data.emails && me() != resource.data.owner
+                        && request.resource.data.emails.toSet() == resource.data.emails.toSet().difference([me()].toSet())
+                        && request.resource.data.owner == resource.data.owner);
+      allow delete: if signedIn() && me() == resource.data.owner;
+
+      match /{col}/{docId} {
+        allow read, write: if signedIn() && col in ['zoznam', 'oblubene', 'kupony']
+          && me() in get(/databases/$(database)/documents/households/$(hid)).data.emails;
+      }
+    }
+  }
+}
