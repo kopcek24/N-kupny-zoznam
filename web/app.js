@@ -130,7 +130,8 @@ function dealsFor(name){
 function queueSemantic(){}
 
 /* ---------- ukladanie (Firestore, spoločné pre domácnosť) ---------- */
-const colRef = col => FB.collection(FB.db,"households",state.hh.id,col);
+// zoznam a kupóny sú spoločné pre domácnosť, obľúbené má každý používateľ vlastné
+const colRef = col => col==="oblubene" ? FB.collection(FB.db,"users",state.user.uid,"oblubene") : FB.collection(FB.db,"households",state.hh.id,col);
 async function add(col, data){
   if(state.user){ data.by=state.user.email; data.byName=state.user.displayName||state.user.email; }
   try{ await FB.addDoc(colRef(col),data); }catch(e){ console.error(e); flash("Nepodarilo sa uložiť."); }
@@ -367,7 +368,7 @@ function openMembers(){
     <div class="members">${hh.emails.map(e=>`<div class="mrow"><span>${esc(e)} ${e===hh.owner?"<small>· založil</small>":""}${e===me?"<small> · ty</small>":""}</span>
       ${(owner&&e!==me)?`<button class="link" data-act="rmMember" data-email="${esc(e)}">Odobrať</button>`:""}</div>`).join("")}</div>
     <form class="add" id="memberForm" style="margin:0"><input id="memberInput" type="email" placeholder="e-mail (Google účet)" autocomplete="off" aria-label="E-mail nového člena"><button class="btn">Pridať</button></form>
-    <p class="note" style="margin:0">Nový člen otvorí túto aplikáciu, prihlási sa cez Google týmto e-mailom a hneď uvidí váš spoločný zoznam, kupóny aj obľúbené.</p>
+    <p class="note" style="margin:0">Nový člen otvorí túto aplikáciu, prihlási sa cez Google týmto e-mailom a hneď uvidí váš spoločný zoznam a kupóny. Obľúbené má každý svoje.</p>
     ${(!owner)?`<button class="link" data-act="leave" style="color:var(--sale);justify-self:start">Opustiť túto domácnosť</button>`:""}
     <button class="btn ghost" data-act="logout">Odhlásiť sa</button>
     <button class="btn ghost" data-act="close">Zavrieť</button>`;

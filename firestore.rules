@@ -5,6 +5,11 @@ service cloud.firestore {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function me() { return request.auth.token.email.lower(); }
 
+    // obľúbené: každý používateľ len svoje
+    match /users/{uid}/oblubene/{docId} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     match /households/{hid} {
       allow read: if signedIn() && me() in resource.data.emails;
       allow create: if signedIn() && request.resource.data.owner == me()
@@ -20,7 +25,7 @@ service cloud.firestore {
       allow delete: if signedIn() && me() == resource.data.owner;
 
       match /{col}/{docId} {
-        allow read, write: if signedIn() && col in ['zoznam', 'oblubene', 'kupony']
+        allow read, write: if signedIn() && col in ['zoznam', 'kupony']
           && me() in get(/databases/$(database)/documents/households/$(hid)).data.emails;
       }
     }

@@ -39,7 +39,7 @@ GitHub Pages zadarmo funguje pre **verejný** repozitár (pre súkromný treba G
 - **APK súbor (voliteľné):** na <https://www.pwabuilder.com> zadaj adresu aplikácie → *Package for stores* → *Android* → stiahneš APK zadarmo.
 
 ## Členovia domácnosti
-Vpravo hore ťukni na svoju fotku → zadaj e-mail Google účtu člena → **Pridať**. Člen otvorí aplikáciu, prihlási sa cez Google a vidí ten istý zoznam, kupóny aj obľúbené. Zmeny sa zobrazujú naživo.
+Vpravo hore ťukni na svoju fotku → zadaj e-mail Google účtu člena → **Pridať**. Člen otvorí aplikáciu, prihlási sa cez Google a vidí ten istý nákupný zoznam a kupóny. Zmeny sa zobrazujú naživo. **Obľúbené má každý používateľ vlastné**, viazané na jeho účet. Kto nemá pridaného člena, má zoznam len pre seba.
 
 ## Ručné spustenie prehľadávania
 ```bash
