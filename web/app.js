@@ -437,7 +437,11 @@ $("gbtn").addEventListener("click",async()=>{
   $("loginMsg").textContent="";
   try{ await FB.signInWithPopup(FB.auth,FB.provider); }
   catch(e){
-    if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(e.code)) return FB.signInWithRedirect(FB.auth,FB.provider);
+    const inFrame = window.top!==window.self;
+    if(["auth/popup-blocked","auth/operation-not-supported-in-this-environment","auth/cancelled-popup-request"].includes(e.code)){
+      if(inFrame){ $("loginMsg").innerHTML=`Prihlásenie vo vloženom okne sa nepodarilo. <a href="${location.href}" target="_blank" rel="noopener">Otvor aplikáciu na celú obrazovku</a> a prihlás sa tam.`; return; }
+      return FB.signInWithRedirect(FB.auth,FB.provider);
+    }
     if(e.code!=="auth/popup-closed-by-user") $("loginMsg").textContent="Prihlásenie sa nepodarilo ("+e.code+").";
   }
 });
