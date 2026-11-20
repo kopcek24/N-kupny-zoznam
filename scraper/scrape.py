@@ -284,6 +284,12 @@ def parse_lidl(pages, dfrom, dto):
                 while k >= 0 and L[k] and len(blk) < 9 and not STOP.search(L[k]):
                     blk.insert(0, L[k])
                     k -= 1
+            # názov rozdelený cez stĺpec: "Supercena Kokosovo-" ... "čokoládová / tyčinka"
+            if blk and blk[0][:1].islower():
+                for k in range(j - 1, max(j - 6, -1), -1):
+                    if L[k].endswith("-") and not STOP.search(L[k]):
+                        blk.insert(0, re.sub(r"^(Supercena|Výhodné|Novinka)\s+", "", L[k]))
+                        break
             si = next((k for k, x in enumerate(blk) if SIZE.match(x)), None)
             if not si:
                 continue
@@ -299,7 +305,8 @@ def parse_lidl(pages, dfrom, dto):
             if not cand:
                 continue
             p = min(cand, key=lambda x: abs(x - est))
-            name = re.sub(r"\s*/\s*", "/", " ".join(nm)).strip()
+            name = re.sub(r"(\w)- (\w)", r"\1-\2", re.sub(r"\s*/\s*", "/", " ".join(nm))).strip()
+            name = re.sub(r"^(Supercena|Výhodné|Novinka)\s+", "", name)
             mdate = re.match(r"od pondelka (\d+)\. (\d+)\. do (\d+)\. (\d+)\.\s*", name)
             f, tt = dfrom, dto
             if mdate:

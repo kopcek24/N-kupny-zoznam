@@ -64,7 +64,7 @@ const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">
 const todayISO = () => { const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const fmtD = iso => { if(!iso) return ""; const [y,m,d]=iso.split("-"); return (+d)+". "+(+m)+"."; };
 const eur = n => (n==null||n==="")?"":Number(n).toLocaleString("sk-SK",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
-const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
+const norm = s => String(s||"").replace(/['’`´]/g,"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
 function lsSet(k,v){ try{ localStorage.setItem("nakupy:"+k,JSON.stringify(v)); }catch(e){} }
 function flash(t){ $("status").textContent=t; }
 
@@ -80,11 +80,22 @@ const catVersion = () => Object.entries(state.katalog).map(([k,c])=>k+(c.updated
 const hasCatalog = () => catalog().length>0;
 const status = d => (d.f && d.f>todayISO()) ? "next" : "now";
 
+/* Zhoda slova s ohľadom na slovenské koncovky: "syr" = syra, syrom; "pivo" = piva; ale "mila" ≠ milacikov, milas */
+const SUFX=new Set(["","a","u","y","e","i","o","om","ou","ov","mi","ami","ach","och","iu","ej","ia","ie","ov","ho","mu","ych","ym","ymi","ove","ova","ovy","ovu","ovej","ovych"]);
+function wordMatch(w,x){
+  if(x===w) return true;
+  if(w.length<=5){
+    if(x.startsWith(w) && SUFX.has(x.slice(w.length))) return true;
+    const b=w.slice(0,-1); return /[aeiouy]$/.test(w) && x.startsWith(b) && SUFX.has(x.slice(b.length));
+  }
+  const stem=w.slice(0,-1);
+  return x.startsWith(stem) && x.length-stem.length<=5;
+}
 function tokenMatch(item, d){
   const words = norm(item).split(" ").filter(w=>w.length>=3);
   if(!words.length) return false;
   const dw = norm(d.n+" "+(d.k||"")).split(" ");
-  return words.every(w=>{ const stem=w.length<=5?w:w.slice(0,-1); return dw.some(x=>x.startsWith(stem)); });
+  return words.every(w=>dw.some(x=>wordMatch(w,x)));
 }
 /* Bezplatné hľadanie: slová položky + slovník príbuzných výrazov (bez AI). */
 const SYN = {
@@ -92,6 +103,7 @@ const SYN = {
   "bravcove":["krkovicka","bravcove plece","bravcove kare","bravcovy bocik","bravcove maso"],
   "kuracie":["kuracie","kura","kuraci"],
   "kuracie prsia":["kuracie prsia","kuracie prsne","kuracie rezne","prsne filety"],
+  "piva":["pivo"],
   "pivo":["pivo","lezak","radler","bazant","krusovice","pilsner","kozel","radegast","smadny","staropramen","budweiser","corgon","saris","topvar","argus","birell","heineken","gambrinus","velkopopovicky"],
   "mlieko":["mlieko","trvanlive mlieko","cerstve mlieko"],
   "jogurt":["jogurt","jogobella","activia","actimel","kefir","skyr","zott","rajo"],
@@ -117,14 +129,19 @@ const SYN = {
   "toaletny papier":["toaletny papier","toaletny","zewa","tento","velvet"],
   "plienky":["plienky","pampers","huggies","lupilu"],
 };
+const NOT = { pivo:["energet","napoj","sirup","limonad","dzus","stava","cokolad"], piva:["energet","napoj"], vino:["ocot","sirup"], maslo:["susienk","pecivo","makovk","kolac"], vajcia:["prekvapen","kinder","surprise","salat","cokolad"], mlieko:["cokolad","kakao","acid"] };
 function variants(item){
   const n=norm(item), out=[item];
   for(const [k,v] of Object.entries(SYN)){ if(n===k || (k.includes(" ")&&n.includes(k))) out.push(...v); }
   return out;
 }
 function dealsFor(name){
-  const cat=catalog(), vs=variants(name);
-  const list=cat.filter(d=>vs.some(v=>tokenMatch(v,d)));
+  const cat=catalog();
+  // "Rumba / čokoládová tyčinka" = hľadaj každú alternatívu zvlášť
+  const alts=String(name).split(/\s*\/\s*/).filter(Boolean);
+  const vs=alts.flatMap(variants);
+  const bad=alts.flatMap(a=>{ const n=norm(a); return Object.entries(NOT).filter(([k])=>n===k||n.split(" ").includes(k)).flatMap(([,v])=>v); });
+  const list=cat.filter(d=>vs.some(v=>tokenMatch(v,d)) && !bad.some(b=>norm(d.n+" "+(d.k||"")).includes(b)));
   return list.sort((a,b)=>(status(a)==="now"?0:1)-(status(b)==="now"?0:1)||(a.p??99)-(b.p??99));
 }
 function queueSemantic(){}
@@ -162,11 +179,13 @@ const PLUS='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="
 const dkey = d => d.store+"|"+d.n+"|"+(d.s||"");
 function dealCard(d, act){
   const nx=status(d)==="next", pct=d.op&&d.p?Math.round((1-d.p/d.op)*100):null;
-  const meta=[d.s, d.u, d.c?`<span class="cond">${esc(d.c)}</span>`:"", nx?`<span class="when">platí od ${fmtD(d.f)}</span>`:(d.t?"do "+fmtD(d.t):"")].filter(Boolean);
+  // 1. riadok: názov (množstvo); 2. riadok: podmienky a platnosť. Cenu za kg/l neukazujeme.
+  const when = nx?`<span class="when">platí od ${fmtD(d.f)}${d.t?" do "+fmtD(d.t):""}</span>`:(d.t?`platí do ${fmtD(d.t)}`:"");
+  const meta=[d.c?`<span class="cond">${esc(d.c)}</span>`:"", when].filter(Boolean);
   const tag=act?"button":"div", attrs=act?` data-act="pick" ${act}`:"";
   return `<${tag} class="deal ${nx?"next":""} ${act&&act.includes("data-on=\"1\"")?"picked":""}"${attrs}>${STORES[d.store].logo}
-    <span class="info"><span class="pn">${esc(d.n)}${d.k?`<small> · ${esc(d.k)}</small>`:""}</span>
-    <span class="pm">${meta.map(m=>m.startsWith("<")?m:esc(m)).join(" · ")}</span></span>
+    <span class="info"><span class="pn">${esc(d.n)}${d.k?`<small> · ${esc(d.k)}</small>`:""}${d.s?` <small>(${esc(d.s)})</small>`:""}</span>
+    ${meta.length?`<span class="pm">${meta.join(" · ")}</span>`:""}</span>
     <span class="pp"><b>${d.p!=null?eur(d.p):"akcia"}</b>${d.op||pct?`<span>${d.op?eur(d.op):""}${d.op&&pct?" · ":""}${pct?`<em>−${pct} %</em>`:""}</span>`:""}</span></${tag}>`;
 }
 const picksOf = i => Array.isArray(i.picks)? i.picks : (i.pick? [i.pick] : []);
