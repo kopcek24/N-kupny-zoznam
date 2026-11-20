@@ -1,12 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signInWithCustomToken, getRedirectResult, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const fbApp = initializeApp(firebaseConfig);
 const FB = { auth:getAuth(fbApp), provider:new GoogleAuthProvider(),
   db:initializeFirestore(fbApp,{localCache:persistentLocalCache()}),
-  signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut,
+  signInWithPopup, signInWithRedirect, signInWithCustomToken, getRedirectResult, onAuthStateChanged, signOut,
   collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDocs, arrayUnion, arrayRemove };
 FB.provider.setCustomParameters({prompt:"select_account"});
 import { LOGO } from "./logos.js";
@@ -426,7 +426,14 @@ async function startHousehold(user){
       err=>{ console.error(err); flash("Dáta sa nedajú načítať. Skontroluj pripojenie."); }));
   }
 }
+// Automatické prihlásenie z hlavnej aplikácie (domter.lovable.app) cez jednorazový token v URL.
+const urlAuthToken = new URLSearchParams(location.search).get("auth");
+if(urlAuthToken){
+  history.replaceState(null,"",location.pathname);
+  FB.signInWithCustomToken(FB.auth,urlAuthToken).catch(e=>console.error("Automatické prihlásenie zlyhalo:",e));
+}
 FB.onAuthStateChanged(FB.auth, async user=>{
+  if(user&&!user.email&&user.uid.includes("@"))user.email=user.uid;
   state.user=user;
   $("login").hidden=!!user; $("app").hidden=!user; $("dockNav").hidden=!user;
   if(!user){ unsubs.forEach(u=>u()); unsubs=[]; return; }
